@@ -1,35 +1,23 @@
 <?php
 
-$sites = array(
-        'intras.com.do'=>array(
-        'title'=>'INTRAS',
-        'link'=>'intras.com.do',
-        'person_name'=>'experto',
-        'onlist'=>false
-    ),
-    'temasdevanguardia.com'=>array(
-        'title'=>'Temas de Vanguardia',
-        'link'=>'temasdevanguardia.com',
-        'person_name'=>'experto',
-        'onlist'=>false
-        ),
-    'managementupdate.com.do'=>array(
-        'title'=>'Management Update',
-        'link'=>'managementupdate.com.do',
-        'onlist'=>false
-        ),
-    'gestion.com.do'=>array(
-        'title'=>'Gestion',
-        'link'=>'gestion.com.do',
-        'person_name'=>'autor',
-        'onlist'=>false
-        ),
-    'intrasbookstore.com'=>array(
-        'title'=>'INTRAS Bookstore',
-        'link'=>'intrasbookstore.com',
-        'onlist'=>false
-        )
-    );
+include 'inc/sites.php';
+
+function check_site_exists( $url, $sites ){
+
+    if( array_key_exists( $url, $sites ) ){
+        return $url;
+    }else{
+
+        if( str_contains( $url, 'dev.' ) ){
+
+            $prod_url = str_replace('dev.', '', $url);
+
+            return $prod_url;
+        }
+    }
+
+    return false;
+}
 
 // Obtener los items segun el id de
 function get_facilitator_items( $id ){
@@ -44,7 +32,7 @@ function get_facilitator_items( $id ){
     
     if( $dominio_actual ){
 
-        $facilitadores = get_the_terms( $id , $sites[$dominio_actual]['person_name']);
+        $facilitadores = get_the_terms( $id , $sites[check_site_exists($dominio_actual, $sites)]['person_name']);
 
         if( $facilitadores ){
 
@@ -94,7 +82,7 @@ function facilitator_redirect_template($template, ) {
 
         $facilitator = get_terms(
             array(
-                'taxonomy' => $sites[$_SERVER['SERVER_NAME']]['person_name'],
+                'taxonomy' => $sites[check_site_exists($_SERVER['SERVER_NAME'], $sites)]['person_name'],
                 'meta_query' => array(
                     array(
                         'key' => 'sipgo_id',
@@ -106,10 +94,10 @@ function facilitator_redirect_template($template, ) {
             )
         );
 
+
         if( $facilitator ){
 
-            header( 'Location: ' . get_home_url() . "/" . $sites[$_SERVER['HTTP_HOST']]['person_name'] . "/" . $facilitator[0]->slug );
-
+            header( 'Location: ' . get_home_url() . "/" . $sites[check_site_exists($_SERVER['SERVER_NAME'], $sites)]['person_name'] . "/" . $facilitator[0]->slug );
         }
     }
 

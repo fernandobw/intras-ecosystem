@@ -2,6 +2,13 @@
 
 class Ecosistema_Controller{
 
+    public static function get_sites(){
+
+        include '../sites.php';
+
+        return $sites;
+    }
+
     static function api_call( $id ){
 
         $curl = curl_init();
@@ -33,97 +40,53 @@ class Ecosistema_Controller{
         return "Hola";
     }
 
-    public static function get_facilitator( $data ){
+    public static function get_facilitator($data) {
 
-        if( isset( $_GET['facilitator_id'] ) ){
+        $facilitator_id = isset($_GET['facilitator_id']) ? $_GET['facilitator_id'] : null;
+        $site_url = isset($_GET['site']) ? $_GET['site'] : null;
 
-            $facilitator_id = $_GET['facilitator_id'];
-            $site_url = $_GET['site'];
-            $intras_events = self::check_intras_events( $facilitator_id );
-
-            // Esto es porque dependiendo del sitio se le tiene un nombre a la persona (autor, experto, etc)
-            $sites = array(
-                'intras.com.do'=>array(
-                    'title'=>'INTRAS',
-                    'link'=>'intras.com.do',
-                    'person_name'=>'expert',
-                    'onlist'=>false,
-                    'active'=>false
-                ),
-                'temasdevanguardia.com'=>array(
-                    'title'=>'Temas de Vanguardia',
-                    'link'=>'temasdevanguardia.com',
-                    'person_name'=>'expert',
-                    'onlist'=>false,
-                    'active'=>true
-                ),
-                'managementupdate.com.do'=>array(
-                    'title'=>'Management Update',
-                    'link'=>'managementupdate.com.do',
-                    'person_name'=>'autor',
-                    'onlist'=>false,
-                    'active'=>false
-                ),
-                'gestion.com.do'=>array(
-                    'title'=>'Gestion',
-                    'link'=>'gestion.com.do',
-                    'person_name'=>'autor',
-                    'onlist'=>false,
-                    'active'=>true
-                ),
-                'intrasbookstore.com'=>array(
-                    'title'=>'INTRAS Bookstore',
-                    'link'=>'intrasbookstore.com',
-                    'onlist'=>false,
-                    'active'=>false
-                )
-            );
-
-            $facilitator_info = self::api_call( $facilitator_id );
-
-            foreach( $facilitator_info->data as $item ){
-
-                foreach( $sites as $site ){
-
-                    if( $site['active'] ){
-
-                        if( str_contains($item->url, $site['link'] ) && !str_contains($item->url, $site_url) && !$site['onlist'] ){
-
-                            $result = array(
-                                'title'=>$site['title']
-                            );
-
-                            if( isset( $site['person_name'] ) ){
-
-                                $result['link'] = $site['link'] . "/redirect/facilitator/{$facilitator_id}?facilitator_id=" . $facilitator_id;
-                            }
-
-                            $results[] = $result;
-
-                            $sites[$site['link']]['onlist'] = true;
-                        }
-                    }
-                }
-            }
-
-            // INTRAS events
-            if( isset( $intras_events->data ) && $sites['intras.com.do']['active'] ){
-
-                $intras_result = array(
-                    'title'=>'INTRAS'
-                );
-
-                if( isset( $sites['intras.com.do']['person_name'] ) ){
-
-                    $intras_result['link'] = $sites['intras.com.do']['link'] . "/eventos?{$sites['intras.com.do']['person_name']}_id=" . $facilitator_id;
-                }
-
-                array_unshift($results , $intras_result);
-            }
-
-            return rest_ensure_response( $results );
+        if (!$facilitator_id || !$site_url) {
+            return; // Retorna si falta algún parámetro
         }
+
+        // Definir información de los sitios
+        $sites = self::get_sites();
+
+        // Llamada a la API para obtener información del facilitador
+        $facilitator_info = self::api_call($facilitator_id);
+        $results = array();
+
+        // Procesar la información de los facilitadores
+        foreach ($facilitator_info->data as $item) {
+
+            foreach ($sites as $site) {
+
+                if ($site['active'] && str_contains($item->url, self::check_site_exists($site['link'], $sites)) && !str_contains($item->url, check_site_exists($site_url, $sites) ) && !$site['onlist']) {
+
+                    $result = array('title' => $site['title']);
+
+                    if (isset($site['person_name'])) {
+                        $result['link'] = $site['link'] . "/redirect/facilitator/{$facilitator_id}?facilitator_id=" . $facilitator_id;
+                    }
+
+                    $results[] = $result;
+                    $sites[$site['link']]['onlist'] = true;
+                }
+            }
+        }
+
+        // Agregar eventos de INTRAS si están activos
+        if (isset($intras_events->data) && $sites['intras.com.do']['active']) {
+            $intras_result = array('title' => 'INTRAS');
+            if (isset($sites['intras.com.do']['person_name'])) {
+                $intras_result['link'] = $sites['intras.com.do']['link'] . "/eventos?{$sites['intras.com.do']['person_name']}_id=" . $facilitator_id;
+            }
+            array_unshift($results, $intras_result);
+        }
+
+        return rest_ensure_response($results);
     }
+
 
     public static function check_intras_events( $facilitator_id ){
 
@@ -167,12 +130,12 @@ class Ecosistema_Controller{
 
         $dominio_actual = $_SERVER['HTTP_HOST'];
 
-        if( $dominio_actual == 'temasdevanguardia.com' ) {
+        if( $dominio_actual == 'temasdevanguardia.com' ||  $dominio_actual == 'dev.temasdevanguardia.com' ) {
 
             add_action('experto_edit_form_fields', array('Ecosistema_Controller', 'sipgo_id_field') );
             add_action('edited_experto', array('Ecosistema_Controller', 'intras_guardar_campo_personalizado_taxonomy'));
 
-        }elseif($dominio_actual == 'gestion.com.do') {
+        }elseif( $dominio_actual == 'gestion.com.do' ) {
 
             add_action('autor_edit_form_fields', array('Ecosistema_Controller', 'sipgo_id_field') );
             add_action('edited_autor', array('Ecosistema_Controller', 'intras_guardar_campo_personalizado_taxonomy'));
@@ -205,6 +168,23 @@ class Ecosistema_Controller{
             $sipgo_id = sanitize_text_field($_POST['sipgo_id']);
             update_term_meta($term_id, 'sipgo_id', $sipgo_id);
         }
+    }
+
+    public static function check_site_exists($site_link, $sites) {
+
+        if( array_key_exists( $url, $sites ) ){
+            return $url;
+        }else{
+
+            if( str_contains( $url, 'dev.' ) ){
+
+                $prod_url = str_replace('dev.', '', $url);
+
+                return $prod_url;
+            }
+        }
+
+        return false;
     }
 }
 
